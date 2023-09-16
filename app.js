@@ -27,42 +27,76 @@ databaseIntialization();
 
 const checkRequest = (request, response, next) => {
   const { search_q, status, priority, category, date } = request.query;
-  if (status !== undefined) {
-    const statusValues = ["TO DO", "IN PROGRESS", "DONE"];
-    if (statusValues.includes(status)) {
-      request.status = status;
-      next();
+
+  if (category !== undefined) {
+    const categoryArray = ["WORK", "HOME", "LEARNING"];
+    const categoryIsInArray = categoryArray.includes(category);
+    if (categoryIsInArray === true) {
+      request.category = category;
     } else {
       response.status(400);
-      response.send("Invalid Todo Status");
+      response.send("Invalid Todo Category");
+      return;
     }
   }
 
   if (priority !== undefined) {
-    const priorityValues = ["HIGH", "MEDIUM", "LOW"];
-    if (priorityValues.includes(priority)) {
+    const priorityArray = ["HIGH", "MEDIUM", "LOW"];
+    const priorityIsInArray = priorityArray.includes(priority);
+    if (priorityIsInArray === true) {
       request.priority = priority;
-      next();
     } else {
       response.status(400);
       response.send("Invalid Todo Priority");
+      return;
     }
   }
 
+  if (status !== undefined) {
+    const statusArray = ["TO DO", "IN PROGRESS", "DONE"];
+    const statusIsInArray = statusArray.includes(status);
+    if (statusIsInArray === true) {
+      request.status = status;
+    } else {
+      response.status(400);
+      response.send("Invalid Todo Status");
+      return;
+    }
+  }
+
+  if (date !== undefined) {
+    const myDate = new Date(date);
+    const formattedDate = format(date, "yyyy-MM-dd");
+    console.log(`formatted-Date${formattedDate}`);
+    const result = isValid(formattedDate);
+    if (result === true) {
+      request.date = formattedDate;
+    } else {
+      response.status(400);
+      response.send("Invalid Due Date");
+      return;
+    }
+  }
+  next();
   //middleware end bracket
   console.log(`status:${status}`);
   console.log(`priority:${priority}`);
 };
 
 app.get("/todos/", checkRequest, async (request, response) => {
-  const { status = "", priority = "" } = request;
+  const { status = "", priority = "", search_q = "", category = "" } = request;
   console.log(`priority in get:${priority}`);
   console.log(`status in get:${status}`);
   const requestQueries = `
-    SELECT * FROM todo
-    WHERE status LIKE'%${status}%' AND priority LIKE'%${priority}';
+    SELECT id,
+            todo,
+            priority,
+            status,
+            category,
+            due_date AS dueDate FROM todo
+    WHERE todo LIKE '%${search_q}%' AND category LIKE '%${category}%' AND status LIKE'%${status}%' AND priority LIKE'%${priority}';
     `;
-  const detailsArray = await data.get(requestQueries);
+  const detailsArray = await data.all(requestQueries);
   //   response.send({
   //     id: detailsArray.id,
   //     todo: detailsArray.todo,
@@ -74,3 +108,4 @@ app.get("/todos/", checkRequest, async (request, response) => {
   response.send(detailsArray);
   response.end();
 });
+module.exports = app;
