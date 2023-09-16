@@ -1,93 +1,76 @@
 const express = require("express");
-const app = express();
 const path = require("path");
-const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
+const sqlite3 = require("sqlite3");
 const bcrypt = require("bcrypt");
-app.use(express.json());
 const jwt = require("jsonwebtoken");
+const app = express();
+app.use(express.json());
+let format = require("date-fns/format");
+let isValid = require("date-fns/isValid");
 let data = null;
 const databaseIntialization = async () => {
   try {
-    let dbPath = path.join(__dirname, "todoApplication.db");
+    let dbpath = path.join(__dirname, "todoApplication.db");
     data = await open({
-      filename: dbPath,
+      filename: dbpath,
       driver: sqlite3.Database,
     });
     app.listen(3000, () => {
-      console.log(`Server is running at ${dbPath}`);
+      console.log(`Server is running at ${dbpath}`);
     });
   } catch (error) {
-    console.log(`Error ${error.message}`);
+    console.log(`database error ${error.message}`);
   }
 };
 databaseIntialization();
-//creating logger
-// const logger = (request, response, next) => {
-//   const header = request.headers["authorization"];
-//   if (header === undefined) {
-//     response.status(401);
-//     response.send("Invalid JWT Token");
-//   } else {
-//     let jwtToken = header.split(" ")[1];
-//     jwt.verify(jwtToken, "My_TOKEN", async (error, payload) => {
-//       if (error) {
-//         response.status(401);
-//         response.send("Invalid JWT Token");
-//       } else {
-//         next();
-//       }
-//     });
-//   }
-// };
 
-//user get
-app.get("/todos/", async (request, response) => {
-  const { status, priority, search_q = "", category } = request.query;
-  let getDetailsQuery = "";
-  switch (true) {
-    case status !== undefined:
-      getDetailsQuery = `
-        SELECT * FROM todo
-        WHERE todo LIKE '%${search_q}%' and status='${status}'
-        `;
-      break;
-
-    case priority !== undefined:
-      getDetailsQuery = `
-        SELECT * FROM todo 
-        WHERE todo LIKE '%${search_q}%' AND priority='${priority}'
-        `;
-      break;
-    case priority !== undefined && status !== undefined:
-      getDetailsQuery = `
-        SELECT * FROM todo 
-        WHERE todo LIKE '%${search_q}%' AND priority='${priority}' AND status='${status}'
-        `;
-      break;
-    case category !== undefined && status !== undefined:
-      getDetailsQuery = `
-        SELECT * FROM todo 
-        WHERE todo LIKE '%${search_q}%' AND category='${category}' AND status='${status}'
-        `;
-    case category !== undefined:
-      getDetailsQuery = `
-        SELECT * FROM todo 
-        WHERE todo LIKE '%${search_q}%' AND category='${category}';
-        `;
-    case category !== undefined && priority !== undefined:
-      getDetailsQuery = `
-        SELECT * FROM todo
-        WHERE todo LIKE '%${search_q}%' AND category='${category}' AND priority='${priority}'
-        `;
-    default:
-      getDetailsQuery = `
-        SELECT * FROM todo 
-        WHERE todo LIKE '%${search_q}%'
-        `;
+const checkRequest = (request, response, next) => {
+  const { search_q, status, priority, category, date } = request.query;
+  if (status !== undefined) {
+    const statusValues = ["TO DO", "IN PROGRESS", "DONE"];
+    if (statusValues.includes(status)) {
+      request.status = status;
+      next();
+    } else {
+      response.status(400);
+      response.send("Invalid Todo Status");
+    }
   }
-  const getDetailsArray = await data.get(getDetailsQuery);
-  response.send(getDetailsArray);
-});
 
-module.exports = app;
+  if (priority !== undefined) {
+    const priorityValues = ["HIGH", "MEDIUM", "LOW"];
+    if (priorityValues.includes(priority)) {
+      request.priority = priority;
+      next();
+    } else {
+      response.status(400);
+      response.send("Invalid Todo Priority");
+    }
+  }
+
+  //middleware end bracket
+  console.log(`status:${status}`);
+  console.log(`priority:${priority}`);
+};
+
+app.get("/todos/", checkRequest, async (request, response) => {
+  const { status = "", priority = "" } = request;
+  console.log(`priority in get:${priority}`);
+  console.log(`status in get:${status}`);
+  const requestQueries = `
+    SELECT * FROM todo
+    WHERE status LIKE'%${status}%' AND priority LIKE'%${priority}';
+    `;
+  const detailsArray = await data.get(requestQueries);
+  //   response.send({
+  //     id: detailsArray.id,
+  //     todo: detailsArray.todo,
+  //     priority: detailsArray.priority,
+  //     status: detailsArray.status,
+  //     category: detailsArray.category,
+  //     dueDate: detailsArray.due_date,
+  //   });
+  response.send(detailsArray);
+  response.end();
+});
